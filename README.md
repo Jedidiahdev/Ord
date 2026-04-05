@@ -1,3 +1,7 @@
+<div align="center">
+
+<img src="ord logo.png" width="120" height="120" alt="Ord Logo">
+
 # Ord v3.0 - AI-Native Company Operating System
 
 <p align="center">
