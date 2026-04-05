@@ -1,20 +1,3 @@
-"""
-Ord v3.0 - Content Designer Agent (Ord-Content)
-Copy, branding, marketing assets, and messaging.
-
-Patterns Implemented:
-- Learning & Adaptation (Ch9): Tone and style improvement
-- Memory Management (Ch8): Brand voice consistency
-- Tool Use (Ch5): Content generation tools
-
-Responsibilities:
-1. Copywriting for all products
-2. Brand voice consistency
-3. Marketing asset creation
-4. Documentation writing
-5. Messaging strategy
-"""
-
 import asyncio
 import time
 from typing import Any, Dict, List, Optional

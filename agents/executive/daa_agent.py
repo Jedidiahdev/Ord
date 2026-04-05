@@ -1,15 +1,3 @@
-"""
-Ord v3.0 - Data Analyst Agent (Ord-DAA)
-Analytics, dashboards, forecasting, and cross-cutting intelligence.
-
-Patterns Implemented:
-- Reasoning Techniques (Ch17): Statistical analysis, modeling
-- RAG (Ch14): Data retrieval and analysis
-- Tool Use (Ch5): Visualization, reporting tools
-
-Unique Power: Cross-cutting access to all executive data for insights
-"""
-
 import asyncio
 import random
 import time

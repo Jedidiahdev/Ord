@@ -1,15 +1,3 @@
-"""
-Ord v3.0 - Orchestrator (Ord-Orchestrator)
-Lightweight message bus and A2A communication fabric.
-
-Patterns Implemented:
-- A2A Communication (Ch15): Inter-agent messaging
-- Routing (Ch2): Intelligent message routing
-- Model Context Protocol (Ch10): Schema validation
-
-Function: Message bus ONLY - no business logic, just routing
-"""
-
 import asyncio
 import json
 import time

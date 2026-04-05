@@ -1,16 +1,3 @@
-"""
-Ord v3.0 - Main Entry Point
-AI-Native Company Operating System
-
-Usage:
-    python main.py
-
-Environment Variables:
-    TELEGRAM_BOT_TOKEN - Telegram bot token
-    OPENAI_API_KEY - OpenAI API key (optional)
-    STRIPE_API_KEY - Stripe API key (optional)
-"""
-
 import asyncio
 import os
 import sys
@@ -72,9 +59,9 @@ class OrdCompany:
     
     async def initialize(self):
         """Initialize all agents and systems"""
-        # ═══════════════════════════════════════════════════════════════════════════════
+        
         # LAYER 1: EXECUTIVE COUNCIL
-        # ═══════════════════════════════════════════════════════════════════════════════
+        
         self.logger.info("👑 Initializing Executive Council...")
         
         pm = PMAgent(orchestrator=self.orchestrator, memory_manager=self.memory)
@@ -85,9 +72,9 @@ class OrdCompany:
         self.orchestrator.register_agent(coo)
         self.orchestrator.register_agent(cfa)
         
-        # ═══════════════════════════════════════════════════════════════════════════════
+        
         # LAYER 2: DOMAIN LEADERS
-        # ═══════════════════════════════════════════════════════════════════════════════
+        
         self.logger.info("📊 Initializing Domain Leaders...")
         
         bd = BDAgent(orchestrator=self.orchestrator, memory_manager=self.memory)
@@ -102,9 +89,9 @@ class OrdCompany:
         self.orchestrator.register_agent(daa)
         self.orchestrator.register_agent(sec)
         
-        # ═══════════════════════════════════════════════════════════════════════════════
+        
         # LAYER 3: EXECUTION TEAM
-        # ═══════════════════════════════════════════════════════════════════════════════
+        
         self.logger.info("🔨 Initializing Execution Team...")
         
         se = SEAgent(orchestrator=self.orchestrator, memory_manager=self.memory)
@@ -121,9 +108,9 @@ class OrdCompany:
         self.orchestrator.register_agent(fullstack_a)
         self.orchestrator.register_agent(fullstack_b)
         
-        # ═══════════════════════════════════════════════════════════════════════════════
+        
         # TELEGRAM BOT (Primary Interface)
-        # ═══════════════════════════════════════════════════════════════════════════════
+        
         bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
         if bot_token:
             self.logger.info("📱 Initializing Telegram Bot...")
@@ -137,9 +124,9 @@ class OrdCompany:
         else:
             self.logger.info("⚠️ No TELEGRAM_BOT_TOKEN found. Running without Telegram.")
         
-        # ═══════════════════════════════════════════════════════════════════════════════
+        
         # START BACKGROUND TASKS
-        # ═══════════════════════════════════════════════════════════════════════════════
+        
         asyncio.create_task(self.orchestrator.process_messages())
         asyncio.create_task(coo.start_health_monitoring())
         

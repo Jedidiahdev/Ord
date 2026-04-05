@@ -1,20 +1,3 @@
-"""
-Ord v3.0 - Backend Lead Agent (Ord-FullStack-B)
-APIs, databases, DevOps, and infrastructure.
-
-Patterns Implemented:
-- Parallelization (Ch3): API development in parallel
-- Model Context Protocol (Ch10): API schema validation
-- Tool Use (Ch5): Database tools, deployment tools
-
-Responsibilities:
-1. API design and implementation
-2. Database schema design
-3. DevOps and deployment pipelines
-4. Infrastructure management
-5. Performance optimization
-"""
-
 import asyncio
 import time
 from typing import Any, Dict, List, Optional

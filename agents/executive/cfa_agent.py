@@ -1,16 +1,3 @@
-"""
-Ord v3.0 - Chief Financial Agent (Ord-CFA)
-Stripe + crypto treasury, revenue tracking, and financial governance.
-
-Patterns Implemented:
-- Memory Management (Ch8): Financial transaction history
-- Evaluation & Monitoring (Ch19): Revenue metrics and forecasting
-- Tool Use (Ch5): Payment processing, wallet management
-- Exception Handling (Ch12): Anomaly detection in transactions
-
-Unique Power: Read/write financial data (writes require CEO approval via PM)
-"""
-
 import asyncio
 import hashlib
 import json

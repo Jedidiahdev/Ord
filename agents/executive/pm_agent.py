@@ -1,16 +1,3 @@
-"""
-Ord v3.0 - Project Manager Agent (Ord-PM)
-The CEO-level router, planner, and final approver.
-
-Patterns Implemented:
-- Planning (Ch6): Task graph creation and orchestration
-- Routing (Ch2): Intelligent message routing to optimal agents
-- Goal Setting (Ch11): OKR tracking and milestone management
-- Multi-Agent (Ch7): Coordination of cross-domain workflows
-
-Unique Power: Only agent that can initiate cross-domain workflows
-"""
-
 import asyncio
 import json
 import uuid

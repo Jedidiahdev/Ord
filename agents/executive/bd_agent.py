@@ -1,20 +1,3 @@
-"""
-Ord v3.0 - Business Development Agent (Ord-BD)
-Vision, market intelligence, growth strategy, and competitive analysis.
-
-Patterns Implemented:
-- Exploration & Discovery (Ch21): Market research, opportunity identification
-- Tool Use (Ch5): Web search, competitor analysis
-- Reasoning Techniques (Ch17): Strategic decision making
-
-Responsibilities:
-1. Market intelligence and trend analysis
-2. Competitive landscape monitoring
-3. Growth strategy development
-4. Opportunity identification
-5. Product-market fit evaluation
-"""
-
 import asyncio
 import time
 from typing import Any, Dict, List, Optional

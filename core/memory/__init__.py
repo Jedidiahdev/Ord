@@ -1,10 +1,3 @@
-"""
-Ord v3.0 - Memory Management System
-Unified interface for Hot, Working, and Cold memory tiers.
-
-Feature 19: Long-Term Memory Pruning & Consolidation
-"""
-
 import asyncio
 from typing import Any, Dict, List, Optional
 

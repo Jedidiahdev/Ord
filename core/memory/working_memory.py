@@ -1,13 +1,3 @@
-"""
-Ord v3.0 - Working Memory (SQLite Layer)
-Structured storage for medium-term context.
-
-Characteristics:
-- Duration: 30 days
-- Format: Compressed summaries
-- Use: Project context, agent relationships
-"""
-
 import json
 import sqlite3
 import time

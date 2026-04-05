@@ -1,15 +1,3 @@
-"""
-Ord v3.0 - Software Engineer Agent (Ord-SE)
-Production code, GitHub commits, feature development.
-
-Patterns Implemented:
-- Tool Use (Ch5): GitHub API, code generation
-- Reflection (Ch4): Code quality improvement
-- Exception Handling (Ch12): Build failure recovery
-
-Constraint: Can only push to feature branches, never main
-"""
-
 import asyncio
 import time
 from typing import Any, Dict, List, Optional

@@ -1,20 +1,3 @@
-"""
-Ord v3.0 - Chief Marketing Agent (Ord-CMA)
-Campaigns, content strategy, ROI tracking, and brand management.
-
-Patterns Implemented:
-- Prioritization (Ch20): Campaign prioritization and resource allocation
-- Reflection (Ch4): Campaign performance analysis
-- Tool Use (Ch5): Content generation, social media integration
-
-Responsibilities:
-1. Marketing campaign management
-2. Content strategy and calendar
-3. ROI tracking and optimization
-4. Brand voice consistency
-5. Customer feedback analysis
-"""
-
 import asyncio
 import time
 from typing import Any, Dict, List, Optional

@@ -1,16 +1,3 @@
-"""
-Ord v3.0 - Chief Operations Agent (Ord-COO)
-Agent welfare, meetings, cost monitoring, and budget enforcement.
-
-Patterns Implemented:
-- Resource-Aware Optimization (Ch16): Token budget management, agent efficiency
-- Exception Handling (Ch12): Incident response, health monitoring
-- Memory Management (Ch8): Intelligent pruning and consolidation
-- Evaluation & Monitoring (Ch19): Agent performance tracking
-
-Unique Power: Can pause any agent for "maintenance" or budget violations
-"""
-
 import asyncio
 import json
 import time

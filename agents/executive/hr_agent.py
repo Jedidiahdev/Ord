@@ -1,15 +1,3 @@
-"""
-Ord v3.0 - Human Resources Agent (Ord-HR)
-Dynamic hiring, culture, agent growth, and team development.
-
-Patterns Implemented:
-- Learning & Adaptation (Ch9): Agent skill development
-- Multi-Agent (Ch7): Team coordination and dynamics
-- Reflection (Ch4): Growth tracking and mentorship
-
-Unique Power: Can add new agents to the system (with CEO approval)
-"""
-
 import asyncio
 import time
 from typing import Any, Dict, List, Optional

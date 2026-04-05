@@ -1,5 +1,3 @@
-# Ord v3.0 - Dockerfile
-# AI-Native Company Operating System
 
 FROM python:3.11-slim
 

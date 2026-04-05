@@ -1,20 +1,3 @@
-"""
-Ord v3.0 - Frontend Lead Agent (Ord-FullStack-A)
-React + Tailwind + shadcn/ui expert, client-side specialist.
-
-Patterns Implemented:
-- Parallelization (Ch3): Component development in parallel
-- Tool Use (Ch5): Frontend build tools, component libraries
-- Reflection (Ch4): UI/UX improvement
-
-Responsibilities:
-1. React application architecture
-2. Tailwind CSS styling
-3. shadcn/ui component implementation
-4. Client-side state management
-5. Responsive design implementation
-"""
-
 import asyncio
 import time
 from typing import Any, Dict, List, Optional

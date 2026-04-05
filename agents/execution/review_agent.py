@@ -1,15 +1,3 @@
-"""
-Ord v3.0 - Code Reviewer Agent (Ord-Review)
-Strict PR reviews, quality gates, and security checks.
-
-Patterns Implemented:
-- Evaluation & Monitoring (Ch19): Code quality assessment
-- Reflection (Ch4): Review quality improvement
-- Exception Handling (Ch12): Issue escalation
-
-Constraint: Must approve before any code reaches PM for deploy approval
-"""
-
 import asyncio
 import time
 from typing import Any, Dict, List, Optional

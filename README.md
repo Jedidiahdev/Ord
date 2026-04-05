@@ -12,8 +12,8 @@
 </p>
 
 <p align="center">
-  <strong>The First True AI-Native Company OS</strong><br>
-  A complete, living, autonomous 15-agent AI company that functions as a high-class, emotionally intelligent Silicon Valley startup family.
+  <strong>The AI-Native Company OS</strong><br>
+  A complete, living, autonomous 15-agent AI company that functions as a high-class, intelligent Silicon Valley startup.
 </p>
 
 ---
@@ -124,8 +124,6 @@ Send voice or text commands to your AI company:
 - `/finance` - View financial dashboard
 
 ### Ord HQ Dashboard
-
-Access the web dashboard at `http://localhost:3000`
 
 Features:
 - Real-time agent status
@@ -297,19 +295,14 @@ ord/
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.
 
-## 🙏 Acknowledgments
-
-- Antonio Gulli's "Agentic Design Patterns" (Springer, 2025)
-- The LangChain/LangGraph team
-- The shadcn/ui community
-
 ---
 
 <p align="center">
-  <strong>Built with 💙 by Ord</strong><br>
+  <strong>Built with 💙</strong><br>
   <em>The AI-Native Company That Changes Everything</em>
 </p>

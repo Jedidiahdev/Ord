@@ -1,11 +1,3 @@
-"""
-Ord v3.0 - Demo Script
-Demonstrates all 50 features and core workflows.
-
-Usage:
-    python demo.py
-"""
-
 import asyncio
 import sys
 from pathlib import Path

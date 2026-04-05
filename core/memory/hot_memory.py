@@ -1,13 +1,3 @@
-"""
-Ord v3.0 - Hot Memory (Redis Layer)
-Fast, ephemeral memory for active context.
-
-Characteristics:
-- Duration: 24 hours
-- Size: <100MB per agent
-- Use: Active tasks, recent conversations
-"""
-
 import time
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field

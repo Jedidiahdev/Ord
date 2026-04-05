@@ -1,14 +1,3 @@
-"""
-Ord v3.0 - Telegram Bot Integration
-Primary interface for CEO communication (voice-first).
-
-Features:
-- Voice message processing (faster-whisper)
-- Command handling (/new_project, /status, /hire)
-- Rich message responses
-- Inline keyboards for approvals
-"""
-
 import asyncio
 import os
 from typing import Any, Dict, Optional

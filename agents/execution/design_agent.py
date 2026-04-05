@@ -1,20 +1,3 @@
-"""
-Ord v3.0 - UI/UX Designer Agent (Ord-Design)
-Vision analysis, shadcn/ui components, design specifications.
-
-Patterns Implemented:
-- Exploration & Discovery (Ch21): Design exploration and iteration
-- Reflection (Ch4): Design quality improvement
-- Tool Use (Ch5): Design tool integration, image analysis
-
-Responsibilities:
-1. UI/UX design and specifications
-2. Vision analysis (screenshots, Figma)
-3. shadcn/ui component selection
-4. Design system maintenance
-5. 20-variation design generation
-"""
-
 import asyncio
 import time
 from typing import Any, Dict, List, Optional

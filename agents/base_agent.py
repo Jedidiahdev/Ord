@@ -1,15 +1,3 @@
-"""
-Ord v3.0 - Base Agent Module
-Implements core agent capabilities with Agentic Design Patterns from Gulli (2025)
-
-Patterns Implemented:
-- Reflection (Ch4): Self-evaluation and improvement
-- Memory Management (Ch8): Hot/Working/Cold memory tiers
-- A2A Communication (Ch15): Inter-agent messaging with cryptographic signing
-- Tool Use (Ch5): Dynamic tool registration and execution
-- Exception Handling (Ch12): Graceful failure recovery
-"""
-
 import asyncio
 import hashlib
 import json

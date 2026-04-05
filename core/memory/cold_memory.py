@@ -1,13 +1,3 @@
-"""
-Ord v3.0 - Cold Memory (ChromaDB Layer)
-Archived memory with semantic search.
-
-Characteristics:
-- Duration: Permanent archive
-- Access: Semantic search only
-- Use: Historical knowledge, Company DNA
-"""
-
 import json
 import time
 from typing import Any, Dict, List, Optional

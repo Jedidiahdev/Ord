@@ -1,13 +1,3 @@
-"""
-Ord v3.0 - Company Genome (DNA)
-Living knowledge system that evolves with the company.
-
-The Genome is Ord's collective memory - every project, decision,
-reflection, and learning contributes to the Company's DNA.
-
-Feature 11: Living Knowledge Genome
-"""
-
 import json
 import time
 from typing import Any, Dict, List, Optional

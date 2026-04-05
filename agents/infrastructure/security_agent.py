@@ -1,15 +1,3 @@
-"""
-Ord v3.0 - Security Chief Agent (Ord-Sec)
-Guardrails, audits, compliance, and zero-trust enforcement.
-
-Patterns Implemented:
-- Guardrails (Ch18): Policy enforcement, output validation
-- Exception Handling (Ch12): Security incident response
-- Model Context Protocol (Ch10): Secure message validation
-
-Unique Power: Can block any action that violates policy
-"""
-
 import asyncio
 import hashlib
 import json
