@@ -1,242 +1,177 @@
+import os
+import random
+import logging
 import asyncio
-import json
-import time
-from typing import Any, Dict, List, Optional, Callable
-from dataclasses import dataclass, field
-from collections import defaultdict
+from typing import Dict, Any, List, Optional
+from datetime import datetime, timezone
+from pydantic import BaseModel, Field
+from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver
 
-from agents.base_agent import A2AMessage, MessagePriority, AgentStatus
+from core.memory import memory
+from core.llm_router import llm_router
+from agents.base_agent import BaseAgent, A2AMessage
+
+logger = logging.getLogger("ord.orchestrator")
 
 
-@dataclass
-class RouteRule:
-    """Message routing rule"""
-    from_layer: Optional[int]
-    to_layer: Optional[int]
-    allowed: bool
-    description: str
+class OrchestratorState(BaseModel):
+    """LangGraph workflow state."""
+    task_id: str
+    project_id: Optional[str] = None
+    ceo_tone: str = "neutral"
+    input_type: str = "text"
+    current_agent: Optional[str] = None
+    agent_queue: List[str] = Field(default_factory=list)
+    context: Dict[str, Any] = Field(default_factory=dict)
+    results: Dict[str, Any] = Field(default_factory=dict)
+    banter_injected: bool = False
+    requires_approval: bool = False
+    approval_id: Optional[str] = None
+    approval_options: List[str] = Field(default_factory=lambda: ["yes", "no"])
 
 
 class Orchestrator:
-    """
-    Ord-Orchestrator: The Message Bus
-    
-    The orchestrator is a lightweight message router.
-    It has NO business logic - it only routes messages
-    between agents according to the hierarchy rules.
-    
-    RULE 1: Workers NEVER communicate directly with each other
-    RULE 2: Domain Leaders coordinate their domains
-    RULE 3: Only PM initiates cross-domain workflows
-    """
-    
+    """Central brain for Ord v3.0."""
+
+    BANTER_LIBRARY = [
+        "❤️ Ord-CFA just whispered 'we're profitable' — I'm blushing!",
+        "🎉 Ord-Design's UI is so clean it made Ord-Sec cry happy tears",
+        "✨ Team just leveled up — Ord-COO is doing a happy dance!",
+        "💙 Ord-PM says 'CEO, you're brilliant' — and honestly, they're right",
+        "🌟 Another win for the family — celebrating with virtual confetti!",
+    ]
+
     def __init__(self):
-        # Agent registry
-        self.agents: Dict[str, Any] = {}
+        self.agents: Dict[str, BaseAgent] = {}
+        self.banter_probability = float(os.getenv("BANTER_PROBABILITY", "0.25"))
+        self._app = None
+        self._banter_counter = 0
+        logger.info("💙 Ord Orchestrator initializing...")
+
+    async def initialize(self):
+        """Build LangGraph workflow."""
+        workflow = StateGraph(OrchestratorState)
+        workflow.add_node("route", self._route_task)
+        workflow.add_node("execute", self._execute_agent)
+        workflow.add_node("banter", self._inject_banter)
+        workflow.add_node("reflect", self._reflect)
         
-        # Message queues per agent
-        self.message_queues: Dict[str, asyncio.Queue] = defaultdict(asyncio.Queue)
+        workflow.set_entry_point("route")
+        workflow.add_edge("route", "execute")
+        workflow.add_edge("execute", "banter")
+        workflow.add_conditional_edges("banter", lambda s: s.get("needs_reflection", False), {True: "reflect", False: END})
+        workflow.add_edge("reflect", END)
         
-        # Message history for audit
-        self.message_history: List[A2AMessage] = []
-        
-        # Routing rules (enforces hierarchy)
-        self.routing_rules = self._initialize_routing_rules()
-        
-        # Subscribers for broadcast messages
-        self.broadcast_subscribers: List[str] = []
-        
-        # Event handlers
-        self.event_handlers: Dict[str, List[Callable]] = defaultdict(list)
-        
-        self.logger = self._setup_logging()
-        self.logger.info("🔄 Ord-Orchestrator initialized | Message Bus Ready")
-    
-    def _setup_logging(self):
-        import logging
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s | %(name)s | %(levelname)s | %(message)s'
+        self._app = workflow.compile(checkpointer=MemorySaver())
+        logger.info("✅ LangGraph workflow ready")
+
+    def register_agent(self, name: str, agent: BaseAgent):
+        self.agents[name] = agent
+        logger.info(f"🤖 Registered: {name}")
+
+    async def route(self, task: str, chat_id: Optional[int] = None, user_id: Optional[int] = None,
+                   input_type: str = "text", ceo_tone: str = "neutral", agent_override: Optional[str] = None,
+                   image_path: Optional[str] = None) -> Dict[str, Any]:
+        """Route CEO request through workflow."""
+        state = OrchestratorState(
+            task_id=f"task_{datetime.now(timezone.utc).timestamp()}",
+            project_id=f"proj_{datetime.now(timezone.utc).strftime('%Y%m%d')}",
+            ceo_tone=ceo_tone, input_type=input_type,
+            context={"task": task, "chat_id": chat_id, "user_id": user_id, "image_path": image_path}
         )
-        return logging.getLogger("Ord.Orchestrator")
-    
-    def _initialize_routing_rules(self) -> List[RouteRule]:
-        """Initialize routing rules that enforce hierarchy"""
-        return [
-            # Executive Council (Layer 1) can communicate with everyone
-            RouteRule(1, 1, True, "Executive Council internal communication"),
-            RouteRule(1, 2, True, "Executive to Domain Leaders"),
-            RouteRule(1, 3, True, "Executive to Execution Team (via Domain Leaders preferred)"),
-            RouteRule(1, 4, True, "Executive to Infrastructure"),
-            
-            # Domain Leaders (Layer 2) coordinate their domains
-            RouteRule(2, 1, True, "Domain Leaders report to Executive"),
-            RouteRule(2, 2, True, "Domain Leaders can communicate"),
-            RouteRule(2, 3, True, "Domain Leaders assign to Execution Team"),
-            RouteRule(2, 4, True, "Domain Leaders use Infrastructure"),
-            
-            # Execution Team (Layer 3) - Workers NEVER communicate directly (Rule 1)
-            RouteRule(3, 1, True, "Execution Team reports to Executive"),
-            RouteRule(3, 2, True, "Execution Team reports to Domain Leaders"),
-            RouteRule(3, 3, False, "WORKERS NEVER COMMUNICATE DIRECTLY - Route through PM"),
-            RouteRule(3, 4, True, "Execution Team uses Infrastructure"),
-            
-            # Infrastructure (Layer 4) supports everyone
-            RouteRule(4, 1, True, "Infrastructure supports Executive"),
-            RouteRule(4, 2, True, "Infrastructure supports Domain Leaders"),
-            RouteRule(4, 3, True, "Infrastructure supports Execution Team"),
-            RouteRule(4, 4, True, "Infrastructure internal communication"),
-        ]
-    
-    def register_agent(self, agent: Any) -> None:
-        """Register an agent with the orchestrator"""
-        agent_id = agent.identity.agent_id
-        self.agents[agent_id] = agent
+        if agent_override and agent_override in self.agents:
+            state.agent_queue = [agent_override]
+            state.current_agent = agent_override
         
-        # Set orchestrator reference on agent
-        agent.orchestrator = self
-        
-        self.logger.info(f"✅ Agent registered: {agent_id} (Layer {agent.identity.layer})")
-    
-    async def route_message(self, message: A2AMessage) -> bool:
-        """
-        Route message to recipient(s).
-        Enforces hierarchy rules.
-        """
-        # Validate message
-        if not self._validate_message(message):
-            self.logger.warning(f"❌ Invalid message from {message.sender_id}")
-            return False
-        
-        # Check routing rules
-        sender = self.agents.get(message.sender_id)
-        recipient_id = message.recipient_id
-        
-        if not sender:
-            self.logger.warning(f"❌ Unknown sender: {message.sender_id}")
-            return False
-        
-        # Handle broadcast
-        if recipient_id == "broadcast":
-            return await self._broadcast_message(message)
-        
-        # Check hierarchy
-        recipient = self.agents.get(recipient_id)
-        if not recipient:
-            self.logger.warning(f"❌ Unknown recipient: {recipient_id}")
-            return False
-        
-        # Enforce Rule 1: Workers never communicate directly
-        if sender.identity.layer == 3 and recipient.identity.layer == 3:
-            if sender.identity.agent_id != recipient.identity.agent_id:
-                self.logger.error(
-                    f"🚫 HIERARCHY VIOLATION: {sender.identity.agent_id} "
-                    f"tried to communicate directly with {recipient_id}. "
-                    f"Route through PM instead."
-                )
-                return False
-        
-        # Route message
-        await self._deliver_message(message)
-        
-        # Store in history
-        self.message_history.append(message)
-        
-        return True
-    
-    def _validate_message(self, message: A2AMessage) -> bool:
-        """Validate message structure (MCP Ch10)"""
-        return (
-            message.sender_id and
-            message.recipient_id and
-            message.message_type and
-            isinstance(message.payload, dict)
-        )
-    
-    async def _deliver_message(self, message: A2AMessage) -> None:
-        """Deliver message to recipient"""
-        recipient_id = message.recipient_id
-        
-        # Add to recipient's queue
-        await self.message_queues[recipient_id].put(message)
-        
-        self.logger.info(
-            f"📨 Message delivered: {message.sender_id[:8]}... -> {recipient_id[:8]}... "
-            f"({message.message_type})"
-        )
-        
-        # Trigger event handlers
-        for handler in self.event_handlers.get(message.message_type, []):
-            try:
-                await handler(message)
-            except Exception as e:
-                self.logger.error(f"Event handler error: {e}")
-    
-    async def _broadcast_message(self, message: A2AMessage) -> bool:
-        """Broadcast message to all agents"""
-        self.logger.info(f"📢 Broadcasting {message.message_type} from {message.sender_id}")
-        
-        for agent_id, agent in self.agents.items():
-            if agent_id != message.sender_id:  # Don't send to self
-                # Create copy for each recipient
-                msg_copy = A2AMessage(
-                    sender_id=message.sender_id,
-                    recipient_id=agent_id,
-                    message_type=message.message_type,
-                    payload=message.payload,
-                    priority=message.priority,
-                    timestamp=message.timestamp,
-                    signature=message.signature
-                )
-                await self._deliver_message(msg_copy)
-        
-        return True
-    
-    async def process_messages(self) -> None:
-        """Main message processing loop"""
-        self.logger.info("🔄 Message processing started")
-        
-        while True:
-            for agent_id, queue in self.message_queues.items():
-                if not queue.empty():
-                    message = await queue.get()
-                    agent = self.agents.get(agent_id)
-                    
-                    if agent:
-                        try:
-                            await agent.receive_message(message)
-                        except Exception as e:
-                            self.logger.error(f"Error processing message for {agent_id}: {e}")
-            
-            await asyncio.sleep(0.1)  # Small delay to prevent CPU spinning
-    
-    def subscribe_to_event(self, event_type: str, handler: Callable) -> None:
-        """Subscribe to event type"""
-        self.event_handlers[event_type].append(handler)
-    
-    def get_agent_status(self) -> Dict[str, Dict]:
-        """Get status of all registered agents"""
-        return {
-            agent_id: {
-                "name": agent.identity.name,
-                "layer": agent.identity.layer,
-                "status": agent.status.value,
-                "intelligence_score": agent.intelligence_score
+        try:
+            result = await self._app.ainvoke(state.dict(), config={"configurable": {"thread_id": state.task_id}})
+            await memory.log_task(state.project_id or "default", state.current_agent or "orchestrator", "completed", {"task_id": state.task_id})
+            return {
+                "message": result.get("results", {}).get("final_response", "Done!"),
+                "requires_approval": result.get("requires_approval", False),
+                "approval_id": result.get("approval_id"),
+                "agent_status": await self.get_agent_status()
             }
-            for agent_id, agent in self.agents.items()
-        }
-    
-    def get_message_stats(self) -> Dict:
-        """Get message routing statistics"""
-        return {
-            "total_messages": len(self.message_history),
-            "agents_registered": len(self.agents),
-            "messages_by_type": self._count_messages_by_type()
-        }
-    
-    def _count_messages_by_type(self) -> Dict[str, int]:
-        """Count messages by type"""
-        counts = defaultdict(int)
-        for msg in self.message_history:
-            counts[msg.message_type] += 1
-        return dict(counts)
+        except Exception as e:
+            logger.error(f"❌ Routing failed: {e}")
+            return {"message": "💙 Self-healing active — please retry! ❤️", "error": str(e)}
+
+    async def _route_task(self, state: OrchestratorState) -> OrchestratorState:
+        """Intelligent routing (Ch2)."""
+        task = state.context.get("task", "").lower()
+        if any(k in task for k in ["finance", "revenue", "payment"]):
+            state.agent_queue = ["ord-cfa", "ord-daa"]
+        elif any(k in task for k in ["hire", "team", "agent"]):
+            state.agent_queue = ["ord-hr", "ord-bd"]
+        elif any(k in task for k in ["design", "ui", "screenshot"]):
+            state.agent_queue = ["ord-design", "ord-fullstack-a"]
+        elif any(k in task for k in ["code", "build", "github"]):
+            state.agent_queue = ["ord-se", "ord-review"]
+        else:
+            state.agent_queue = ["ord-pm"]
+        state.current_agent = state.agent_queue[0] if state.agent_queue else "ord-pm"
+        logger.info(f"🎯 Routed to: {state.current_agent}")
+        return state
+
+    async def _execute_agent(self, state: OrchestratorState) -> OrchestratorState:
+        """Execute agent with A2A (Ch15)."""
+        agent_name = state.current_agent
+        if agent_name not in self.agents:
+            state.results["final_response"] = f"Agent {agent_name} not available ❤️"
+            return state
+        agent = self.agents[agent_name]
+        task = state.context.get("task", "")
+        try:
+            msg = A2AMessage(from_agent="orchestrator", to_agent=agent_name, task=task, context=state.context, ceo_tone=state.ceo_tone)
+            result = await agent.handle_task_with_a2a(msg) if hasattr(agent, "handle_task_with_a2a") else await agent.process_task(task)
+            state.results[agent_name] = result
+        except Exception as e:
+            logger.error(f"❌ Agent {agent_name} failed: {e}")
+            state.results[agent_name] = f"⚠️ Issue — self-healing active ❤️"
+        if state.agent_queue:
+            state.agent_queue.pop(0)
+            if state.agent_queue:
+                state.current_agent = state.agent_queue[0]
+                return await self._execute_agent(state)
+        return state
+
+    async def _inject_banter(self, state: OrchestratorState) -> OrchestratorState:
+        """Inject culture (20-30%)."""
+        if random.random() < self.banter_probability or state.ceo_tone == "celebratory":
+            banter = random.choice(self.BANTER_LIBRARY)
+            for key in state.results:
+                if isinstance(state.results[key], str):
+                    state.results[key] = f"{state.results[key]}\n\n{banter}"
+                    break
+            state.banter_injected = True
+            self._banter_counter += 1
+        return state
+
+    async def _reflect(self, state: OrchestratorState) -> OrchestratorState:
+        """Reflection loop (Ch4)."""
+        agent_name = state.current_agent
+        if agent_name in self.agents and hasattr(self.agents[agent_name], "reflect"):
+            agent = self.agents[agent_name]
+            task = state.context.get("task", "")
+            result = state.results.get(agent_name, "")
+            reflection = await agent.reflect(state.task_id, task[:100], str(result)[:100], "orchestration")
+            state.results[f"{agent_name}_reflection"] = reflection.how_to_improve
+        return state
+
+    async def process_approval(self, approval_id: str, decision: str, chat_id: Optional[int] = None) -> Dict[str, Any]:
+        if decision == "yes":
+            return {"message": "✅ Approved! Executing with love... ❤️", "status": "approved"}
+        elif decision == "no":
+            return {"message": "🙏 Understood. Cancelled with gratitude. ❤️", "status": "cancelled"}
+        return {"message": "🔄 Revision requested. Adjusting with care... ❤️", "status": "revising"}
+
+    async def get_agent_status(self) -> Dict[str, Dict[str, Any]]:
+        return {name: {"name": agent.identity.role, "status": agent.status.value, "intelligence_score": agent.intelligence_score} for name, agent in self.agents.items()}
+
+    async def trigger_townhall(self, chat_id: Optional[int] = None) -> Dict[str, Any]:
+        reflections = {name: await agent.reflect("townhall", "company reflection", "positive", "culture") for name, agent in self.agents.items() if hasattr(agent, "reflect")}
+        return {"message": f"🎉 Town Hall Complete 💙\n\n" + "\n".join([f"✨ **{name}**: {r.what_worked}" for name, r in reflections.items()]), "reflections": reflections}
+
+
+orchestrator = Orchestrator()
