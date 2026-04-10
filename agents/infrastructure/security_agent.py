@@ -240,6 +240,52 @@ class SecurityAgent(BaseAgent):
                 "Review UI responsiveness across all projects"
             ]
         }
+
+    async def upsert_policy(self, policy_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Policy-as-code entry point: create/update runtime policy definitions."""
+        policy_id = policy_data.get("policy_id")
+        if not policy_id:
+            return {"error": "policy_id is required"}
+        self.policies[policy_id] = SecurityPolicy(
+            policy_id=policy_id,
+            name=policy_data.get("name", policy_id),
+            category=policy_data.get("category", "data"),
+            rules=policy_data.get("rules", []),
+            severity=policy_data.get("severity", "warn"),
+            enabled=policy_data.get("enabled", True),
+        )
+        await self.log_audit_event("ord-sec", "policy_upsert", policy_id, "success")
+        return {"status": "ok", "policy_id": policy_id}
+
+    async def enforce_guardrails(self, agent_id: str, action: str, resource: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Evaluate action against active policies and return allow/deny decision.
+        This is used as a generic guardrail endpoint.
+        """
+        context_text = json.dumps(context, sort_keys=True)
+        blocking_hits = []
+        warning_hits = []
+
+        for policy in self.policies.values():
+            if not policy.enabled:
+                continue
+            for rule in policy.rules:
+                pattern = rule.get("pattern")
+                if pattern and re.search(pattern, context_text, re.IGNORECASE):
+                    target = blocking_hits if policy.severity == "block" else warning_hits
+                    target.append({"policy_id": policy.policy_id, "rule": rule.get("description", "pattern_match")})
+                if rule.get("action") == action and rule.get("requires_approval"):
+                    blocking_hits.append({"policy_id": policy.policy_id, "rule": "requires_approval"})
+
+        outcome = "denied" if blocking_hits else "allowed_with_warnings" if warning_hits else "allowed"
+        await self.log_audit_event(agent_id, action, resource, outcome)
+
+        return {
+            "allowed": not blocking_hits,
+            "outcome": outcome,
+            "blocking_hits": blocking_hits,
+            "warning_hits": warning_hits,
+        }
     
     async def process_task(self, task: Dict) -> Dict[str, Any]:
         """Process Sec-specific tasks"""
@@ -271,5 +317,16 @@ class SecurityAgent(BaseAgent):
                 task.get("outcome")
             )
             return {"entry_id": entry.entry_id}
+        
+        elif task_type == "upsert_policy":
+            return await self.upsert_policy(task.get("policy", {}))
+        
+        elif task_type == "enforce_guardrails":
+            return await self.enforce_guardrails(
+                agent_id=task.get("agent_id", "unknown"),
+                action=task.get("action", "unknown"),
+                resource=task.get("resource", "unknown"),
+                context=task.get("context", {}),
+            )
         
         return {"error": f"Unknown task type: {task_type}"}

@@ -92,6 +92,7 @@ class PMAgent(BaseAgent):
         self.pending_approvals: Dict[str, Dict] = {}
         
         self.logger.info("👑 Ord-PM initialized | CEO Router ready")
+        self.meeting_queue: List[Dict[str, Any]] = []
     
     def get_capabilities(self) -> List[str]:
         return [
@@ -521,6 +522,43 @@ class PMAgent(BaseAgent):
         )
         
         return approval_id
+
+    async def enforce_approval_gate(self, gate: str, context: Dict[str, Any], project_id: Optional[str] = None) -> Dict[str, Any]:
+        """Reusable approval-gate helper for financial/deployment/hiring checkpoints."""
+        approval_id = await self.request_ceo_approval(
+            approval_type=gate,
+            context=context,
+            project_id=project_id,
+        )
+        return {"status": "pending", "approval_id": approval_id, "gate": gate}
+
+    async def schedule_executive_meeting(
+        self,
+        meeting_type: str,
+        attendees: List[str],
+        agenda: str,
+        project_id: Optional[str] = None,
+        scheduled_at: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Create executive meeting requests through COO."""
+        payload = {
+            "task": {
+                "type": "schedule_meeting",
+                "meeting_type": meeting_type,
+                "attendees": attendees,
+                "agenda": agenda,
+                "project_id": project_id,
+                "scheduled_at": scheduled_at,
+            }
+        }
+        self.meeting_queue.append(payload["task"])
+        await self.send_message(
+            recipient_id="ord-coo",
+            message_type="task",
+            payload=payload,
+            priority=MessagePriority.HIGH,
+        )
+        return {"status": "scheduled", "meeting_type": meeting_type}
     
     def _format_approval_request(self, approval_type: str, context: Dict) -> str:
         """Format approval request with warm, professional tone"""
@@ -605,7 +643,21 @@ class PMAgent(BaseAgent):
             )
         elif task_type == "variation_analysis_complete":
             return await self._present_variations_to_ceo(task.get("project_id"))
-        
+        elif task_type == "approval_gate":
+            return await self.enforce_approval_gate(
+                gate=task.get("gate", "general"),
+                context=task.get("context", {}),
+                project_id=task.get("project_id"),
+            )
+        elif task_type == "schedule_executive_meeting":
+            return await self.schedule_executive_meeting(
+                meeting_type=task.get("meeting_type", "sync"),
+                attendees=task.get("attendees", []),
+                agenda=task.get("agenda", "Executive sync"),
+                project_id=task.get("project_id"),
+                scheduled_at=task.get("scheduled_at"),
+            )
+
         return {"error": f"Unknown task type: {task_type}"}
     
     async def _present_variations_to_ceo(self, project_id: str) -> Dict:
