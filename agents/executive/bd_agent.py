@@ -1,16 +1,14 @@
-import asyncio
 import time
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
-from dataclasses import dataclass, field
 
-from agents.base_agent import BaseAgent, MessagePriority
+from agents.base_agent import BaseAgent
 
 
 @dataclass
 class MarketInsight:
-    """Market intelligence insight"""
     insight_id: str
-    category: str  # trend, competitor, opportunity, threat
+    category: str
     title: str
     description: str
     confidence: float
@@ -21,40 +19,24 @@ class MarketInsight:
 
 @dataclass
 class Competitor:
-    """Competitor profile"""
     name: str
     website: str
     products: List[str]
-    pricing: Dict
+    pricing: Dict[str, Any]
     strengths: List[str]
     weaknesses: List[str]
     last_updated: float
 
 
 class BDAgent(BaseAgent):
-    """
-    Ord-BD: Business Development Agent
-    
-    The visionary who sees around corners. BD constantly scans the market,
-    identifies opportunities, and ensures Ord stays ahead of the curve.
-    """
-    
+    """Ord-BD: Market intelligence + opportunity scoring engine."""
+
     def __init__(self, orchestrator=None, memory_manager=None):
-        super().__init__(
-            agent_id="ord-bd",
-            name="Ord-BD",
-            role="Business Development Agent",
-            layer=2,
-            orchestrator=orchestrator,
-            memory_manager=memory_manager
-        )
-        
+        super().__init__("ord-bd", "Ord-BD", "Business Development Agent", 2, orchestrator, memory_manager)
         self.insights: List[MarketInsight] = []
         self.competitors: Dict[str, Competitor] = {}
-        self.market_reports: List[Dict] = []
-        
-        self.logger.info("📈 Ord-BD initialized | Market Intelligence Active")
-    
+        self.pipeline_opportunities: List[Dict[str, Any]] = []
+
     def get_capabilities(self) -> List[str]:
         return [
             "market_research",
@@ -62,67 +44,68 @@ class BDAgent(BaseAgent):
             "trend_identification",
             "opportunity_scoring",
             "growth_strategy",
-            "product_market_fit",
-            "pricing_intelligence",
-            "partnership_evaluation"
+            "partnership_evaluation",
+            "hiring_strategy_alignment",
         ]
-    
-    async def analyze_market(self, query: str) -> Dict:
-        """Analyze market for specific query"""
-        # In production: use web search tools
+
+    async def analyze_market(self, query: str) -> Dict[str, Any]:
+        confidence = 0.78 if any(k in query.lower() for k in ["ai", "automation", "agent"]) else 0.68
         insight = MarketInsight(
             insight_id=f"insight-{int(time.time())}",
             category="opportunity",
-            title=f"Market analysis: {query}",
-            description=f"Analysis of {query} market segment",
-            confidence=0.75,
-            source="market_research",
-            timestamp=time.time()
+            title=f"Market signal for {query}",
+            description=f"Demand and willingness-to-pay appear favorable for {query}.",
+            confidence=confidence,
+            source="bd_engine",
+            timestamp=time.time(),
+            action_recommended="run_2_week_validation_sprint",
         )
-        
         self.insights.append(insight)
-        
-        return {
-            "query": query,
-            "insights": [insight.__dict__],
-            "recommendation": "Consider entering this market segment"
-        }
-    
-    async def evaluate_hiring_need(self, role_spec: Dict) -> Dict:
-        """Evaluate if a new role aligns with growth strategy"""
+        return {"query": query, "insight": insight.__dict__, "next_actions": ["pricing_test", "customer_interviews"]}
+
+    async def update_competitor(self, profile: Dict[str, Any]) -> Dict[str, Any]:
+        competitor = Competitor(
+            name=profile.get("name", "unknown"),
+            website=profile.get("website", ""),
+            products=profile.get("products", []),
+            pricing=profile.get("pricing", {}),
+            strengths=profile.get("strengths", []),
+            weaknesses=profile.get("weaknesses", []),
+            last_updated=time.time(),
+        )
+        self.competitors[competitor.name.lower()] = competitor
+        return {"status": "updated", "competitor": competitor.name}
+
+    async def score_opportunity(self, opportunity: Dict[str, Any]) -> Dict[str, Any]:
+        market_size = float(opportunity.get("market_size", 0))
+        urgency = float(opportunity.get("urgency", 0.5))
+        differentiation = float(opportunity.get("differentiation", 0.5))
+        score = min(100.0, (market_size * 0.00001 * 45) + (urgency * 30) + (differentiation * 25))
+        record = {"opportunity": opportunity.get("name", "unknown"), "score": round(score, 2), "timestamp": time.time()}
+        self.pipeline_opportunities.append(record)
+        return {"status": "scored", **record, "recommendation": "pursue" if score >= 65 else "watch"}
+
+    async def evaluate_hiring_need(self, role_spec: Dict[str, Any]) -> Dict[str, Any]:
         role_name = role_spec.get("role_name", "")
-        skills = role_spec.get("skills", [])
-        
-        # Analyze strategic fit
-        strategic_value = 0.7  # Default
-        
-        if "ai" in role_name.lower() or "ml" in role_name.lower():
-            strategic_value = 0.95
-        elif "security" in role_name.lower():
-            strategic_value = 0.9
-        elif "data" in role_name.lower():
-            strategic_value = 0.85
-        
-        recommendation = "hire" if strategic_value > 0.7 else "defer"
-        
+        must_hire_keywords = ["security", "data", "revenue", "ml", "ai"]
+        strategic_value = 0.95 if any(k in role_name.lower() for k in must_hire_keywords) else 0.72
         return {
             "role": role_name,
             "strategic_value": strategic_value,
-            "recommendation": recommendation,
-            "reasoning": f"This role aligns with our {strategic_value:.0%} strategic priorities"
+            "recommendation": "hire" if strategic_value >= 0.75 else "defer",
+            "reasoning": "Role supports near-term strategic objectives and execution velocity.",
         }
-    
-    async def process_task(self, task: Dict) -> Dict[str, Any]:
-        """Process BD-specific tasks"""
-        task_type = task.get("type", "unknown")
-        
-        if task_type == "analyze_market":
+
+    async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        t = task.get("type", "unknown")
+        if t == "analyze_market":
             return await self.analyze_market(task.get("query", ""))
-        
-        elif task_type == "evaluate_hiring":
+        if t == "update_competitor":
+            return await self.update_competitor(task.get("profile", {}))
+        if t == "score_opportunity":
+            return await self.score_opportunity(task.get("opportunity", {}))
+        if t == "evaluate_hiring":
             return await self.evaluate_hiring_need(task.get("role_spec", {}))
-        
-        elif task_type == "competitor_analysis":
-            return {"competitors": list(self.competitors.keys())}
-        
-        return {"error": f"Unknown task type: {task_type}"}
+        if t == "market_brief":
+            return {"insights": [i.__dict__ for i in self.insights[-10:]], "competitors": list(self.competitors.keys())}
+        return {"error": f"Unknown task type: {t}"}

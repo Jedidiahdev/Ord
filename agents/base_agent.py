@@ -186,8 +186,17 @@ class BaseAgent(ABC, Generic[T]):
         handler = self.tools[tool_name]["handler"]
         return await handler(**kwargs) if asyncio.iscoroutinefunction(handler) else handler(**kwargs)
 
-    async def send_message(self, recipient_id: str, message_type: str, payload: Dict[str, Any], priority: MessagePriority = MessagePriority.NORMAL) -> A2AMessage:
+    async def send_message(
+        self,
+        recipient_id: str,
+        message_type: str,
+        payload: Dict[str, Any],
+        priority: MessagePriority = MessagePriority.NORMAL,
+        **metadata: Any,
+    ) -> A2AMessage:
         message = A2AMessage(sender_id=self.identity.agent_id, recipient_id=recipient_id, message_type=message_type, payload=payload, priority=priority)
+        if metadata:
+            message.payload.setdefault("_meta", {}).update(metadata)
         message.sign(secret=f"ord-{self.identity.agent_id}")
         if self.orchestrator and hasattr(self.orchestrator, "message_bus"):
             await self.orchestrator.message_bus.put(message)

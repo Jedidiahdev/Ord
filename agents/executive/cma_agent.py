@@ -1,104 +1,71 @@
-import asyncio
 import time
-from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 
-from agents.base_agent import BaseAgent, MessagePriority
+from agents.base_agent import BaseAgent
 
 
 @dataclass
 class Campaign:
-    """Marketing campaign"""
     campaign_id: str
     name: str
-    type: str  # email, social, content, paid
-    status: str  # planned, active, completed, paused
+    type: str
+    status: str
     budget: float
     spent: float
     start_date: float
     end_date: Optional[float]
-    metrics: Dict = field(default_factory=dict)
+    metrics: Dict[str, Any] = field(default_factory=dict)
     content_pieces: List[str] = field(default_factory=list)
 
 
 @dataclass
 class ContentPiece:
-    """Individual content piece"""
     content_id: str
-    type: str  # blog, social, email, video
+    type: str
     title: str
     content: str
     status: str
     campaign_id: Optional[str]
     created_at: float
     published_at: Optional[float]
-    performance: Dict = field(default_factory=dict)
+    performance: Dict[str, Any] = field(default_factory=dict)
 
 
 class CMAAgent(BaseAgent):
-    """
-    Ord-CMA: Chief Marketing Agent
-    
-    The voice of Ord to the world. CMA manages campaigns,
-    creates compelling content, and tracks every dollar's ROI.
-    """
-    
+    """Ord-CMA: campaign planning + attribution and ROI tracking."""
+
     def __init__(self, orchestrator=None, memory_manager=None):
-        super().__init__(
-            agent_id="ord-cma",
-            name="Ord-CMA",
-            role="Chief Marketing Agent",
-            layer=2,
-            orchestrator=orchestrator,
-            memory_manager=memory_manager
-        )
-        
+        super().__init__("ord-cma", "Ord-CMA", "Chief Marketing Agent", 2, orchestrator, memory_manager)
         self.campaigns: Dict[str, Campaign] = {}
         self.content_library: Dict[str, ContentPiece] = {}
-        self.brand_guidelines = {
-            "voice": "sweet, loving, professional, encouraging",
-            "colors": ["#FD651E", "#0A0A0A", "#FFFFFF"],
-            "tone": "warm and approachable yet ruthlessly professional"
-        }
-        
-        self.logger.info("📣 Ord-CMA initialized | Brand Guardian")
-    
+
     def get_capabilities(self) -> List[str]:
         return [
             "campaign_management",
             "content_strategy",
             "roi_tracking",
+            "attribution_modeling",
             "brand_management",
-            "social_media",
-            "email_marketing",
-            "copywriting",
-            "customer_feedback_analysis",
-            "marketing_automation"
+            "marketing_automation",
         ]
-    
-    async def create_campaign(self, campaign_spec: Dict) -> Dict:
-        """Create new marketing campaign"""
+
+    async def create_campaign(self, campaign_spec: Dict[str, Any]) -> Dict[str, Any]:
         campaign = Campaign(
             campaign_id=f"campaign-{int(time.time())}",
             name=campaign_spec.get("name", "New Campaign"),
             type=campaign_spec.get("type", "content"),
             status="planned",
-            budget=campaign_spec.get("budget", 0),
-            spent=0,
+            budget=float(campaign_spec.get("budget", 0)),
+            spent=0.0,
             start_date=campaign_spec.get("start_date", time.time()),
-            end_date=campaign_spec.get("end_date")
+            end_date=campaign_spec.get("end_date"),
+            metrics={"leads": 0, "conversions": 0, "revenue": 0.0},
         )
-        
         self.campaigns[campaign.campaign_id] = campaign
-        
-        return {
-            "status": "created",
-            "campaign_id": campaign.campaign_id,
-            "message": f"Campaign '{campaign.name}' created and ready to launch! 🚀"
-        }
-    
-    async def generate_content(self, content_spec: Dict) -> Dict:
-        """Generate marketing content"""
+        return {"status": "created", "campaign_id": campaign.campaign_id, "campaign": campaign.__dict__}
+
+    async def generate_content(self, content_spec: Dict[str, Any]) -> Dict[str, Any]:
         content = ContentPiece(
             content_id=f"content-{int(time.time())}",
             type=content_spec.get("type", "blog"),
@@ -106,49 +73,53 @@ class CMAAgent(BaseAgent):
             content=content_spec.get("content", ""),
             status="draft",
             campaign_id=content_spec.get("campaign_id"),
-            created_at=time.time()
+            created_at=time.time(),
+            published_at=None,
         )
-        
         self.content_library[content.content_id] = content
-        
-        return {
-            "status": "created",
-            "content_id": content.content_id,
-            "preview": content.content[:200] + "..."
-        }
-    
-    async def track_campaign_roi(self, campaign_id: str) -> Dict:
-        """Track and analyze campaign ROI"""
+        if content.campaign_id and content.campaign_id in self.campaigns:
+            self.campaigns[content.campaign_id].content_pieces.append(content.content_id)
+        return {"status": "created", "content_id": content.content_id}
+
+    async def update_campaign_metrics(self, campaign_id: str, metrics_delta: Dict[str, Any]) -> Dict[str, Any]:
         campaign = self.campaigns.get(campaign_id)
         if not campaign:
             return {"error": "Campaign not found"}
-        
-        revenue = campaign.metrics.get("revenue", 0)
+        campaign.spent += float(metrics_delta.get("spent", 0))
+        campaign.metrics["leads"] = campaign.metrics.get("leads", 0) + int(metrics_delta.get("leads", 0))
+        campaign.metrics["conversions"] = campaign.metrics.get("conversions", 0) + int(metrics_delta.get("conversions", 0))
+        campaign.metrics["revenue"] = campaign.metrics.get("revenue", 0.0) + float(metrics_delta.get("revenue", 0.0))
+        return {"status": "updated", "campaign_id": campaign_id, "metrics": campaign.metrics}
+
+    async def track_campaign_roi(self, campaign_id: str) -> Dict[str, Any]:
+        campaign = self.campaigns.get(campaign_id)
+        if not campaign:
+            return {"error": "Campaign not found"}
+
+        revenue = float(campaign.metrics.get("revenue", 0.0))
         spent = campaign.spent
-        roi = ((revenue - spent) / spent * 100) if spent > 0 else 0
-        
+        roi = ((revenue - spent) / spent * 100) if spent > 0 else 0.0
+        cpl = spent / max(campaign.metrics.get("leads", 0), 1)
+        cpa = spent / max(campaign.metrics.get("conversions", 0), 1)
+
         return {
             "campaign": campaign.name,
             "revenue": revenue,
             "spent": spent,
-            "roi_percent": roi,
-            "status": campaign.status
+            "roi_percent": round(roi, 2),
+            "cost_per_lead": round(cpl, 2),
+            "cost_per_acquisition": round(cpa, 2),
+            "status": campaign.status,
         }
-    
-    async def process_task(self, task: Dict) -> Dict[str, Any]:
-        """Process CMA-specific tasks"""
-        task_type = task.get("type", "unknown")
-        
-        if task_type == "create_campaign":
+
+    async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        t = task.get("type", "unknown")
+        if t == "create_campaign":
             return await self.create_campaign(task.get("spec", {}))
-        
-        elif task_type == "generate_content":
+        if t == "generate_content":
             return await self.generate_content(task.get("spec", {}))
-        
-        elif task_type == "track_roi":
-            return await self.track_campaign_roi(task.get("campaign_id"))
-        
-        elif task_type == "get_brand_guidelines":
-            return self.brand_guidelines
-        
-        return {"error": f"Unknown task type: {task_type}"}
+        if t == "update_metrics":
+            return await self.update_campaign_metrics(task.get("campaign_id", ""), task.get("delta", {}))
+        if t == "track_roi":
+            return await self.track_campaign_roi(task.get("campaign_id", ""))
+        return {"error": f"Unknown task type: {t}"}
