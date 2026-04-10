@@ -2,6 +2,7 @@ import asyncio
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -25,6 +26,7 @@ from agents.execution.content_agent import ContentAgent
 from agents.execution.review_agent import ReviewAgent
 from agents.execution.frontend_agent import FrontendAgent
 from agents.execution.backend_agent import BackendAgent
+from agents.infrastructure.ord_orchestrator_agent import OrdOrchestratorAgent
 
 # Integration imports
 from integrations.telegram.bot import TelegramBot, TelegramConfig
@@ -100,6 +102,7 @@ class OrdCompany:
         review = ReviewAgent(orchestrator=self.orchestrator, memory_manager=self.memory)
         fullstack_a = FrontendAgent(orchestrator=self.orchestrator, memory_manager=self.memory)
         fullstack_b = BackendAgent(orchestrator=self.orchestrator, memory_manager=self.memory)
+        ord_orchestrator_agent = OrdOrchestratorAgent(orchestrator=self.orchestrator, memory_manager=self.memory)
         
         self.orchestrator.register_agent(se)
         self.orchestrator.register_agent(design)
@@ -107,6 +110,7 @@ class OrdCompany:
         self.orchestrator.register_agent(review)
         self.orchestrator.register_agent(fullstack_a)
         self.orchestrator.register_agent(fullstack_b)
+        self.orchestrator.register_agent(ord_orchestrator_agent)
         
         
         # TELEGRAM BOT (Primary Interface)
