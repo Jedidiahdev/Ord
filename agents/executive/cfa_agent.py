@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from agents.base_agent import BaseAgent, MessagePriority
+from integrations.stripe import StripeService
 
 
 @dataclass
@@ -83,6 +84,7 @@ class CFAAgent(BaseAgent):
         self.stripe_connected = False
         self.stripe = None
         self.stripe_webhook_secret = None
+        self.stripe_service = StripeService()
 
         self.logger.info("💰 Ord-CFA initialized | Treasury Guardian")
 
@@ -100,6 +102,12 @@ class CFAAgent(BaseAgent):
         ]
 
     async def connect_stripe(self, api_key: Optional[str] = None, webhook_secret: Optional[str] = None) -> Dict[str, Any]:
+        if not api_key and not webhook_secret:
+            integration_result = self.stripe_service.connect()
+            if integration_result.get("status") == "connected":
+                self.stripe_connected = True
+                return integration_result
+
         api_key = api_key or os.getenv("STRIPE_API_KEY")
         webhook_secret = webhook_secret or os.getenv("STRIPE_WEBHOOK_SECRET", "")
 
