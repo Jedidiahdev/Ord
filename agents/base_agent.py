@@ -11,6 +11,7 @@ from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
 
 from core.llm_router import llm_router
 from core.memory import memory
+from core.reflection import StructuredReflection
 
 logger = logging.getLogger("ord.agents.base")
 
@@ -98,6 +99,11 @@ class BaseAgent(ABC, Generic[T]):
         "💙 Proud of this step — we’re building something beautiful.",
         "🤗 Thank you for the thoughtful direction.",
         "✨ Little by little, we’re creating magic together.",
+    ]
+    SWEET_CLOSINGS = [
+        "Thanks team — gentle next step: keep assumptions explicit and keep momentum kind.",
+        "Appreciate you all. Coaching note: validate quickly, then scale confidently.",
+        "Thank you for the hustle. Reflection cue: what should we simplify next cycle?",
     ]
 
     def __init__(self, agent_id: str, name: str, role: str, layer: int, orchestrator: Optional[Any] = None, memory_manager: Optional[Any] = None, banter_probability: float = 0.25):
@@ -211,9 +217,22 @@ class BaseAgent(ABC, Generic[T]):
             if isinstance(result, dict):
                 msg = result.get("message", str(result))
                 result["message"] = self._inject_banter(self._tone_prefix(tone) + msg)
+                result["culture_closing"] = random.choice(self.SWEET_CLOSINGS)
                 result["intelligence_score"] = round(self.intelligence_score, 2)
             else:
                 result = {"message": self._inject_banter(self._tone_prefix(tone) + str(result))}
+                result["culture_closing"] = random.choice(self.SWEET_CLOSINGS)
+            reflection = StructuredReflection(
+                task_id=f"live-{int(time.time())}",
+                agent_id=self.identity.agent_id,
+                objective=str(task)[:140],
+                outcome="success",
+                what_worked="Consistent execution with warm communication.",
+                what_failed="No major blockers observed.",
+                next_improvement="Tighten feedback loop with shorter review checkpoints.",
+                intelligence_score=round(self.intelligence_score, 2),
+            )
+            result["reflection"] = reflection.to_payload()
             self.status = AgentStatus.IDLE
             return result
         except Exception:

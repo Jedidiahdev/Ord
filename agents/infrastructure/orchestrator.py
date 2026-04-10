@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from agents.base_agent import A2AMessage, BaseAgent
+from core.feature_backbone import FeatureBackbone
+from integrations.voice.briefing import VoiceBriefingService
 
 logger = logging.getLogger("ord.orchestrator")
 
@@ -45,6 +47,8 @@ class Orchestrator:
         self.agents: Dict[str, BaseAgent] = {}
         self.message_bus: "asyncio.Queue[BusEnvelope]" = asyncio.Queue()
         self.banter_probability = 0.25
+        self.feature_backbone = FeatureBackbone()
+        self.voice_briefing = VoiceBriefingService()
 
     def register_agent(self, name_or_agent: Any, maybe_agent: Optional[BaseAgent] = None):
         if maybe_agent is None:
@@ -90,7 +94,18 @@ class Orchestrator:
             "project_id": state.project_id,
             "results": state.results,
             "agent_status": await self.get_agent_status(),
+            "reflection": {
+                "task_id": state.task_id,
+                "wins": "Cross-functional execution completed.",
+                "improvements": "Increase parallelization for repeated no-op steps.",
+                "next_experiment": "Run governed experiment bundle with financial twin checks.",
+            },
+            "feature_backbone": self.feature_backbone.summary(),
         }
+
+    async def voice_first_briefing(self, command: str, response_payload: Dict[str, Any]) -> Dict[str, Any]:
+        briefing = self.voice_briefing.build_briefing(command, response_payload)
+        return {"narration": briefing.narration, "daa_visuals": briefing.daa_visuals}
 
     def _route_task(self, task: str) -> List[str]:
         text = task.lower()
