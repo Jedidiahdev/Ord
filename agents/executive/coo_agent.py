@@ -44,6 +44,7 @@ class COOAgent(BaseAgent):
         self.token_usage_weekly = 0
         self.token_usage_reset_at = time.time()
         self.maintenance_predictions: Dict[str, Dict[str, Any]] = {}
+        self.intelligence_ledger: List[Dict[str, Any]] = []
 
     def get_capabilities(self) -> List[str]:
         return [
@@ -140,7 +141,31 @@ class COOAgent(BaseAgent):
             "fleet_health": {"healthy_agents": healthy, "total_agents": total, "uptime_percent": round((healthy / max(1, total)) * 100, 2)},
             "maintenance_predictions": self.maintenance_predictions,
             "token_budget": await self.token_budget_governor_snapshot(),
+            "intelligence_compounding": self.compound_intelligence_scores(),
         }
+
+    def compound_intelligence_scores(self) -> Dict[str, Any]:
+        if not self.orchestrator:
+            return {"fleet_average": 0.0, "top_agent": None, "history_points": len(self.intelligence_ledger)}
+        scores = {agent_id: agent.intelligence_score for agent_id, agent in self.orchestrator.agents.items()}
+        if not scores:
+            return {"fleet_average": 0.0, "top_agent": None, "history_points": len(self.intelligence_ledger)}
+
+        top_agent = max(scores, key=scores.get)
+        avg = round(sum(scores.values()) / len(scores), 2)
+        snapshot = {"timestamp": time.time(), "fleet_average": avg, "top_agent": top_agent, "scores": scores}
+        self.intelligence_ledger.append(snapshot)
+        self.intelligence_ledger = self.intelligence_ledger[-200:]
+        return {"fleet_average": avg, "top_agent": top_agent, "history_points": len(self.intelligence_ledger)}
+
+    def town_hall_script(self) -> str:
+        compounding = self.compound_intelligence_scores()
+        return (
+            "💙 Team town hall: thank you for the heart and precision this cycle. "
+            f"Fleet intelligence average is {compounding['fleet_average']}. "
+            f"Top current momentum agent: {compounding['top_agent']}. "
+            "Gentle coaching: keep reflections tight, share blockers early, and celebrate fast wins."
+        )
 
     async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         t = task.get("type", "unknown")
@@ -161,4 +186,8 @@ class COOAgent(BaseAgent):
             return await self._predict_maintenance_needs()
         if t == "welfare_report":
             return await self.team_welfare_report()
+        if t == "intelligence_compound":
+            return self.compound_intelligence_scores()
+        if t == "town_hall":
+            return {"script": self.town_hall_script()}
         return {"error": f"Unknown task type: {t}"}

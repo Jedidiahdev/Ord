@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Callable
 from dataclasses import dataclass, field
 
 from agents.base_agent import BaseAgent, A2AMessage, MessagePriority, AgentStatus
+from integrations.productization.exporter import ProductizationExporter
 
 
 @dataclass
@@ -93,6 +94,7 @@ class PMAgent(BaseAgent):
         
         self.logger.info("👑 Ord-PM initialized | CEO Router ready")
         self.meeting_queue: List[Dict[str, Any]] = []
+        self.productization_exporter = ProductizationExporter()
     
     def get_capabilities(self) -> List[str]:
         return [
@@ -139,8 +141,19 @@ class PMAgent(BaseAgent):
             return await self._initiate_hiring_workflow(request_text)
         elif request_type == "deploy_request":
             return await self._handle_deploy_request(request_text)
+        elif "productize" in request_text.lower() or "export" in request_text.lower():
+            return await self._one_click_productization(request_text)
         else:
             return await self._general_orchestration(request_text)
+
+    async def _one_click_productization(self, request_text: str) -> Dict[str, Any]:
+        app_name = self._extract_project_name(request_text).lower().replace(" ", "-")
+        path = self.productization_exporter.export("exports", app_name)
+        return {
+            "status": "exported",
+            "message": f"✨ One-click productization complete for {app_name}.",
+            "export_path": str(path),
+        }
     
     def _generate_acknowledgment(self, request: str) -> str:
         """Generate warm, professional acknowledgment (Feature 17)"""
