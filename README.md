@@ -112,6 +112,16 @@ docker-compose logs -f ord
 docker-compose down
 ```
 
+### Stack Health Check
+
+```bash
+# Run test baseline first
+pytest -q tests/test_phase6.py tests/test_phase5.py
+
+# Then run per-service startup/runtime health preflight
+python scripts/stack_health_check.py
+```
+
 ## 📱 Interfaces
 
 ### Telegram (Primary)
