@@ -1,8 +1,12 @@
 import os
+import importlib
+import importlib.util
+import sys
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-import httpx
+HTTPX_AVAILABLE = "httpx" in sys.modules or importlib.util.find_spec("httpx") is not None
+httpx = importlib.import_module("httpx") if HTTPX_AVAILABLE else None
 
 
 @dataclass
@@ -36,6 +40,8 @@ class VercelService:
 
         if not self.enabled:
             return {"status": "disabled", "message": "VERCEL_TOKEN not configured"}
+        if httpx is None:
+            return {"status": "disabled", "message": "httpx dependency not installed"}
 
         payload: Dict[str, Any] = {
             "name": name,

@@ -3,11 +3,15 @@ import logging
 import os
 import sqlite3
 import time
+import importlib
+import importlib.util
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import chromadb
+CHROMADB_AVAILABLE = "chromadb" in sys.modules or importlib.util.find_spec("chromadb") is not None
+chromadb = importlib.import_module("chromadb") if CHROMADB_AVAILABLE else None
 
 try:
     import redis.asyncio as redis
@@ -20,6 +24,46 @@ from core.memory.hot_memory import HotMemory
 from core.memory.working_memory import WorkingMemory
 
 logger = logging.getLogger("ord.core.memory")
+
+
+class LocalChromaCollection:
+    """Small local fallback when chromadb isn't installed."""
+
+    def __init__(self) -> None:
+        self._docs: Dict[str, str] = {}
+        self._metadatas: Dict[str, Dict[str, Any]] = {}
+
+    def upsert(self, ids: List[str], documents: List[str], metadatas: Optional[List[Dict[str, Any]]] = None) -> None:
+        for idx, doc_id in enumerate(ids):
+            self._docs[doc_id] = documents[idx]
+            if metadatas and idx < len(metadatas):
+                self._metadatas[doc_id] = metadatas[idx]
+
+    def query(self, query_texts: List[str], n_results: int = 5) -> Dict[str, List[List[str]]]:
+        query = (query_texts[0] if query_texts else "").lower()
+        ranked: List[tuple[float, str]] = []
+        for doc_id, doc in self._docs.items():
+            hay = doc.lower()
+            score = 1.0 if query in hay else 0.0
+            if score > 0:
+                ranked.append((score, doc_id))
+
+        if not ranked:
+            ranked = [(0.0, doc_id) for doc_id in self._docs.keys()]
+
+        ranked.sort(reverse=True)
+        selected_ids = [doc_id for _, doc_id in ranked[:n_results]]
+        return {"documents": [[self._docs[doc_id] for doc_id in selected_ids]]}
+
+
+class LocalChromaClient:
+    def __init__(self) -> None:
+        self._collections: Dict[str, LocalChromaCollection] = {}
+
+    def get_or_create_collection(self, name: str) -> LocalChromaCollection:
+        if name not in self._collections:
+            self._collections[name] = LocalChromaCollection()
+        return self._collections[name]
 
 
 @dataclass
@@ -66,7 +110,11 @@ class FourTierMemorySystem:
         self.company_genome = CompanyGenome(str(self.genome_dir))
 
         self._redis_client = None
-        self._chroma = chromadb.PersistentClient(path=self.chroma_path)
+        if chromadb is not None:
+            self._chroma = chromadb.PersistentClient(path=self.chroma_path)
+        else:
+            logger.warning("chromadb not installed; using LocalChromaClient fallback")
+            self._chroma = LocalChromaClient()
         self._chroma_collections: Dict[str, Any] = {}
         self._genome_graph = GenomeGraph()
 

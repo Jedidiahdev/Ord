@@ -1,12 +1,28 @@
 import asyncio
+import importlib
+import importlib.util
 import logging
 import random
+import sys
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+PYDANTIC_AVAILABLE = "pydantic" in sys.modules or importlib.util.find_spec("pydantic") is not None
+pydantic_mod = importlib.import_module("pydantic") if PYDANTIC_AVAILABLE else None
+
+if pydantic_mod is not None:
+    BaseModel = pydantic_mod.BaseModel
+    Field = pydantic_mod.Field
+else:
+    class BaseModel:
+        def __init__(self, **kwargs: Any):
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
+    def Field(default_factory=None):
+        return default_factory() if default_factory is not None else None
 
 from agents.base_agent import A2AMessage, BaseAgent
 from core.feature_backbone import FeatureBackbone
