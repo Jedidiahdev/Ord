@@ -1,8 +1,10 @@
 import asyncio
+import importlib
+import importlib.util
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -28,10 +30,6 @@ from agents.execution.frontend_agent import FrontendAgent
 from agents.execution.backend_agent import BackendAgent
 from agents.infrastructure.ord_orchestrator_agent import OrdOrchestratorAgent
 
-# Integration imports
-from integrations.telegram.bot import TelegramBot, TelegramConfig
-
-
 class OrdCompany:
     """
     Ord v3.0 - The AI-Native Company
@@ -46,7 +44,7 @@ class OrdCompany:
     def __init__(self):
         self.orchestrator = Orchestrator()
         self.memory = MemoryManager()
-        self.telegram_bot: Optional[TelegramBot] = None
+        self.telegram_bot: Optional[Any] = None
         
         self.logger = self._setup_logging()
         self.logger.info("🌟 Ord v3.0 Initializing...")
@@ -117,14 +115,19 @@ class OrdCompany:
         
         bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
         if bot_token:
-            self.logger.info("📱 Initializing Telegram Bot...")
-            config = TelegramConfig(
-                bot_token=bot_token,
-                ceo_chat_id=os.getenv("CEO_CHAT_ID"),
-                voice_enabled=True
-            )
-            self.telegram_bot = TelegramBot(config, orchestrator=self.orchestrator)
-            await self.telegram_bot.start()
+            telegram_sdk_ready = "telegram" in sys.modules or importlib.util.find_spec("telegram") is not None
+            if telegram_sdk_ready:
+                self.logger.info("📱 Initializing Telegram Bot...")
+                telegram_bot_mod = importlib.import_module("integrations.telegram.bot")
+                config = telegram_bot_mod.TelegramConfig(
+                    bot_token=bot_token,
+                    ceo_chat_id=os.getenv("CEO_CHAT_ID"),
+                    voice_enabled=True
+                )
+                self.telegram_bot = telegram_bot_mod.TelegramBot(config, orchestrator=self.orchestrator)
+                await self.telegram_bot.start()
+            else:
+                self.logger.warning("TELEGRAM_BOT_TOKEN is set but python-telegram-bot isn't installed; continuing without Telegram bot.")
         else:
             self.logger.info("⚠️ No TELEGRAM_BOT_TOKEN found. Running without Telegram.")
         

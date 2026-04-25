@@ -2,10 +2,20 @@ import os
 import base64
 import logging
 import asyncio
+import importlib
+import importlib.util
+import sys
 from typing import Optional
-import httpx
-from openai import AsyncOpenAI
-from faster_whisper import WhisperModel
+
+HTTPX_AVAILABLE = "httpx" in sys.modules or importlib.util.find_spec("httpx") is not None
+OPENAI_AVAILABLE = "openai" in sys.modules or importlib.util.find_spec("openai") is not None
+WHISPER_AVAILABLE = "faster_whisper" in sys.modules or importlib.util.find_spec("faster_whisper") is not None
+
+httpx = importlib.import_module("httpx") if HTTPX_AVAILABLE else None
+openai_mod = importlib.import_module("openai") if OPENAI_AVAILABLE else None
+whisper_mod = importlib.import_module("faster_whisper") if WHISPER_AVAILABLE else None
+AsyncOpenAI = openai_mod.AsyncOpenAI if openai_mod else None
+WhisperModel = whisper_mod.WhisperModel if whisper_mod else None
 
 logger = logging.getLogger("ord.llm_router")
 
@@ -18,15 +28,19 @@ class LLMRouter:
         
         # Clients
         api_key = os.getenv("OPENAI_API_KEY")
-        self.openai = AsyncOpenAI(api_key=api_key) if api_key else None
-        self.http = httpx.AsyncClient(timeout=60)
+        self.openai = AsyncOpenAI(api_key=api_key) if (api_key and AsyncOpenAI is not None) else None
+        self.http = httpx.AsyncClient(timeout=60) if httpx is not None else None
         
         # Voice
-        self.whisper = WhisperModel(os.getenv("WHISPER_MODEL", "small"), device="cpu", compute_type="int8")
+        self.whisper = WhisperModel(os.getenv("WHISPER_MODEL", "small"), device="cpu", compute_type="int8") if WhisperModel is not None else None
         logger.info("✅ LLM Router initialized (Hybrid + Voice + Vision)")
 
     async def transcribe_voice(self, ogg_path: str) -> str:
         """Transcribe voice with faster-whisper."""
+        if self.whisper is None:
+            logger.warning("faster-whisper unavailable; returning placeholder transcription")
+            return f"[Transcription unavailable] {ogg_path}"
+
         try:
             segments, _ = await asyncio.to_thread(self.whisper.transcribe, ogg_path)
             return " ".join(seg.text for seg in segments)
@@ -41,6 +55,8 @@ class LLMRouter:
         # Try offline first if enabled
         if self.use_offline:
             try:
+                if self.http is None:
+                    raise RuntimeError("httpx unavailable")
                 resp = await self.http.post("http://localhost:11434/api/generate", json={"model": self.offline_model, "prompt": full_prompt, "stream": False})
                 return resp.json().get("response", "")
             except Exception as e:

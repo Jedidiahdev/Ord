@@ -1,14 +1,23 @@
 import asyncio
 import base64
+import importlib
+import importlib.util
 import logging
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import httpx
-from faster_whisper import WhisperModel
-from openai import AsyncOpenAI
+HTTPX_AVAILABLE = "httpx" in sys.modules or importlib.util.find_spec("httpx") is not None
+OPENAI_AVAILABLE = "openai" in sys.modules or importlib.util.find_spec("openai") is not None
+WHISPER_AVAILABLE = "faster_whisper" in sys.modules or importlib.util.find_spec("faster_whisper") is not None
+
+httpx = importlib.import_module("httpx") if HTTPX_AVAILABLE else None
+openai_mod = importlib.import_module("openai") if OPENAI_AVAILABLE else None
+whisper_mod = importlib.import_module("faster_whisper") if WHISPER_AVAILABLE else None
+AsyncOpenAI = openai_mod.AsyncOpenAI if openai_mod else None
+WhisperModel = whisper_mod.WhisperModel if whisper_mod else None
 
 logger = logging.getLogger("ord.core.llm_router")
 
@@ -46,22 +55,26 @@ class LLMRouter:
         self.grok_model = os.getenv("GROK_MODEL", "grok-2-latest")
         self.grok_base_url = os.getenv("GROK_BASE_URL", "https://api.x.ai/v1")
 
-        self.openai_client: Optional[AsyncOpenAI] = None
-        if os.getenv("OPENAI_API_KEY"):
+        self.openai_client: Optional[Any] = None
+        if AsyncOpenAI is not None and os.getenv("OPENAI_API_KEY"):
             self.openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-        self.grok_client: Optional[AsyncOpenAI] = None
-        if self.grok_api_key:
+        self.grok_client: Optional[Any] = None
+        if AsyncOpenAI is not None and self.grok_api_key:
             self.grok_client = AsyncOpenAI(api_key=self.grok_api_key, base_url=self.grok_base_url)
 
         whisper_model_name = os.getenv("WHISPER_MODEL", "base")
-        self.whisper = WhisperModel(whisper_model_name, device="cpu", compute_type="int8")
-        self.http = httpx.AsyncClient(timeout=90)
+        self.whisper = WhisperModel(whisper_model_name, device="cpu", compute_type="int8") if WhisperModel is not None else None
+        self.http = httpx.AsyncClient(timeout=90) if httpx is not None else None
 
         logger.info("LLMRouter ready: offline=%s offline_model=%s online_model=%s", self.use_offline_default, self.offline_model, self.online_model)
 
     async def transcribe_voice(self, audio_path: str, language: Optional[str] = None) -> str:
         """Transcribe audio file via faster-whisper."""
+        if self.whisper is None:
+            logger.warning("faster-whisper is not installed; returning audio path as placeholder transcription")
+            return f"[voice transcription unavailable] {Path(audio_path).name}"
+
         audio_file = Path(audio_path)
         if not audio_file.exists():
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
@@ -124,6 +137,8 @@ class LLMRouter:
         raise ValueError(f"Unsupported provider: {provider}")
 
     async def _ollama_generate(self, full_prompt: str) -> str:
+        if self.http is None:
+            raise RuntimeError("httpx is not installed; cannot call Ollama endpoint")
         payload = {"model": self.offline_model, "prompt": full_prompt, "stream": False}
         response = await self.http.post(f"{self.ollama_base_url}/api/generate", json=payload)
         response.raise_for_status()
